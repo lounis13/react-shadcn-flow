@@ -2,8 +2,9 @@ import useGetJobs from "./api/queries.ts";
 import {Button} from "@/components/ui/button.tsx";
 import {AlertCircle, RefreshCw} from "lucide-react";
 import {Alert, AlertDescription, AlertTitle} from "@/components/ui/alert.tsx";
-import {Card, CardContent, CardFooter, CardHeader} from "@/components/ui/card.tsx";
+import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from "@/components/ui/card.tsx";
 import {Link} from "@tanstack/react-router";
+import {Badge} from "@/components/ui/badge.tsx";
 
 export function JobList() {
     const {data, isLoading, error, refetch, isRefetching} = useGetJobs({refetchInterval: 30_000})
@@ -42,12 +43,19 @@ export function JobList() {
                 data?.map(job => <li key={job.id}>
                     <Link to={"/jobs/$jobId" as const} params={{jobId: job.id}} className="block">
                         <Card className="shadow-none hover:shadow-sm cursor-pointer">
-                            <CardHeader>{job.id}</CardHeader>
-                            <CardContent>
-                                {job.status}
-                            </CardContent>
-                            <CardFooter>
+                            <CardHeader>
+                                <CardTitle>{job.name}</CardTitle>
+                            </CardHeader>
 
+                            <CardContent className="flex flex-wrap gap-2">
+                                {job.children.map(child => <Badge key={child.id} className="rounded-none" variant="outline">
+                                    <b>{child.name}</b> {child.status}
+                                </Badge>)}
+                            </CardContent>
+
+                            <CardFooter className="flex justify-between">
+                                <CardDescription>{job.started_at}</CardDescription>
+                                <CardDescription>{job.finished_at}</CardDescription>
                             </CardFooter>
                         </Card>
                     </Link>

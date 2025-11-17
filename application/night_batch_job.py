@@ -4,15 +4,22 @@ from application.build_library_job import BuildLibraryJob, PricingLibrary
 from application.multi_price_job import MultiPriceJob, TriggerMultiPriceInput
 from database import database
 from domain.job_repository import JobRepository
-from domain.models.enums.input_strategy import MergeStrategy
 from domain.models.job import Job
-from domain.services.engine.reactive.reactive_engine import ReactiveEngine
+from domain.models.task import Task
+from domain.services.engine.reactive.reactive_engine import get_engine
 
+
+class Start(Task):
+    async def action(self):
+        print("Starting")
 
 
 class NightBatchJob(Job):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        self.start = Start(parent=self, name="Start")
+
         self.candidate_engine = BuildLibraryJob(
             parent=self,
             name="Building Candidate Image Job",
@@ -21,8 +28,10 @@ class NightBatchJob(Job):
         self.reference_engine = BuildLibraryJob(
             parent=self,
             name="Building Reference Image Job",
-            input=PricingLibrary(name="2.0.0-reference")
+            input=PricingLibrary(name="2.0.0-reference"),
         )
+
+        self.start.add_downstream(self.candidate_engine, self.reference_engine)
 
         self.reference_pricing = MultiPriceJob(
             parent=self,
@@ -52,13 +61,11 @@ async def create() -> NightBatchJob:
 
 async def run(job_id: uuid.UUID):
     async with database.get_session_manager() as session:
-        repo = JobRepository(session)
-        engine = ReactiveEngine(repo)
-        await engine.run(job_id)
+        engine = await get_engine(repository=JobRepository(session), job_id=job_id)
+        await engine.run()
 
 
 async def retry(job_id: uuid.UUID, task_id: uuid.UUID):
     async with database.get_session_manager() as session:
-        repo = JobRepository(session)
-        engine = ReactiveEngine(repo)
-        await engine.retry(job_id, task_id)
+        engine = await get_engine(repository=JobRepository(session), job_id=job_id)
+        await engine.retry(task_id=task_id)

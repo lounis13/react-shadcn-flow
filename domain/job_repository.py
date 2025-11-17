@@ -58,6 +58,6 @@ class JobRepository:
         await self.session.refresh(job)
 
 
-async def get_job_repository() -> JobRepository:
+async def get_job_repository():
     async with database.database.get_session_manager() as session:
-        return JobRepository(session)
+        yield JobRepository(session)

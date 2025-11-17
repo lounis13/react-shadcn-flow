@@ -1,3 +1,5 @@
+import asyncio
+
 from pydantic import BaseModel
 
 from domain.models.enums.input_strategy import MergeStrategy
@@ -19,12 +21,14 @@ class TriggerMultiPrice(Task[TriggerMultiPriceInput, TriggerMultiPriceInput]):
         self.input = input
 
     async def action(self):
+        await asyncio.sleep(1)
         print(f"executing action TriggerMultiPrice {self.parent.name}")
         return self.input
 
 
 class CollationMultiPrice(Task[TriggerMultiPriceInput, TriggerMultiPriceOut]):
     async def action(self):
+        await asyncio.sleep(1)
         print(f"executing action CollationMultiPrice {self.parent.name}")
         return TriggerMultiPriceOut(collation_id=self.input.collation_id, status="OK")
 

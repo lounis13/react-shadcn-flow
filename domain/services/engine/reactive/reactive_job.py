@@ -16,28 +16,31 @@ class ReactiveJob(ReactiveTask):
     children: list[ReactiveTask] = field(default_factory=list)
 
     async def _start_sub_job(self, *events: Event):
+        print(f"Starting {self.task.name} with {events}")
         try:
-            if self.is_setup(*events):
-                return await self._start(event_type=EventType.SETUP)
-            elif self.is_retry(*events):
+            if self.is_retry(*events):
                 await self.set_status(Status.READY_TO_RETRY)
                 return await self._start(event_type=EventType.RETRY)
+
+            if self.is_setup(*events) or not self.task.is_runnable:
+                return await self._start(event_type=EventType.SETUP)
             else:
-                await self._start(event_type=EventType.RUN)
                 await self.refresh_input()
-                return self.task
+                return await self._start(event_type=EventType.RUN)
         except Exception as e:
             await self.set_status(Status.FAILED, str(e))
             await self.finish()
+            return Event(task=self.task, type=EventType.FAILED)
 
     async def handler(self, *events: Event):
+        print(f"JOB Handling {self.task.name} events: {events}")
         try:
             statuses = [event.task.status for event in events]
             final_status = Status.compute(statuses)
             if final_status.is_final() and self.task.status != final_status:
                 await self.finish()
             await self.set_status(final_status)
-            if final_status == Status.READY_TO_RETRY:
+            if self.is_retry(*events):
                 return Event(task=self.task, type=EventType.RETRY)
             if self.is_setup(*events):
                 return Event(task=self.task, type=EventType.SETUP)
@@ -71,14 +74,15 @@ class ReactiveJob(ReactiveTask):
         )
 
     async def _start(self, event_type: EventType = EventType.SETUP):
+        print(f"Starting {self.task.name} with {event_type} event")
         if event_type == EventType.SETUP:
             return self.subject.on_next(Event(task=self.task, type=event_type))
         if event_type == EventType.RETRY:
             return self.subject.on_next(Event(task=self.task, type=event_type))
         await self.start_now()
         await self.locked_update(self.task.start)
-        await self.set_status(Status.RUNNING)
         return self.subject.on_next(Event(task=self.task, type=event_type))
+
 
     async def start(self) -> None:
         print("starting job ", self.task)

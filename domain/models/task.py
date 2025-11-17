@@ -12,7 +12,7 @@ from domain.models.mixins.base import Base
 from domain.models.mixins.io import IO, OutputT, InputT
 from domain.models.mixins.lifecycle import Lifecycle
 from domain.models.mixins.timestamp import Timestamp
-from domain.models.task_dependency import Dependency
+from domain.models.task_dependency import Dependency, TaskDependency
 
 if TYPE_CHECKING:
     from domain.models.job import Job
@@ -64,6 +64,14 @@ class Task(Base, IO[InputT, OutputT], Dependency, Generic[InputT, OutputT], Life
         cascade="all, delete-orphan",
         lazy="selectin",
         join_depth=5
+    )
+
+    dependencies: Mapped[list[TaskDependency]] = relationship(
+        TaskDependency,
+        back_populates="job",
+        cascade="all, delete-orphan",
+        foreign_keys=[TaskDependency.job_id],
+        lazy="selectin",
     )
 
     @property

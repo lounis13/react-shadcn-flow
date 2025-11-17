@@ -7,7 +7,7 @@ import {type Edge, type Node, Position, type XYPosition} from '@xyflow/react';
 import type {ElkEdge, ElkNode} from './elk-types';
 
 /**
- * Collect edges from ELK node hierarchy
+ * Collect edges from the ELK node hierarchy
  */
 export function collectEdges(levelEdges: ElkEdge[] | undefined, output: Edge[]): void {
     if (!levelEdges) return;

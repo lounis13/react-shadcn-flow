@@ -37,9 +37,7 @@ class ReactiveTask:
     @property
     def observable(self) -> Observable:
         if not self._observable:
-            self._observable = combine_latest(self.subject, self._get_observable()).pipe(
-                operators.share(),
-            )
+            self._observable = self._get_observable()
         return self._observable
 
     def is_setup(self, *events: Event):
@@ -48,11 +46,12 @@ class ReactiveTask:
     def is_retry(self, *events: Event):
         return any(_event.type == EventType.RETRY for _event in events)
 
-    async def _handler(self, *events: Event):
+    async def handler(self, *events: Event):
+        print(f"Handling {self.task.name} events: {events}")
         try:
             if self.is_setup(*events):
                 return Event(task=self.task, type=EventType.SETUP)
-            if self.is_retry(*events):
+            if self.is_retry(*events) and self.subject.value.type != EventType.RUN:
                 await self.set_status(Status.READY_TO_RETRY)
                 return Event(task=self.task, type=EventType.RETRY)
 
@@ -72,17 +71,17 @@ class ReactiveTask:
 
     def _get_observable(self) -> Observable:
         if self.is_root:
-            return self.parent.subject.pipe(
-                operators.flat_map(lambda x: from_future(asyncio.ensure_future(self._handler(x)))),
+            return combine_latest(self.subject, self.parent.subject).pipe(
+                operators.map(flatten_tuple_to_list),
+                operators.flat_map(lambda x: from_future(asyncio.ensure_future(self.handler(*x)))),
                 operators.share()
             )
 
         else:
             obs = [up.observable for up in self.upstream]
-            observable = combine_latest(*obs) if len(obs) > 1 else obs[0]
-            return observable.pipe(
+            return combine_latest(self.subject, *obs).pipe(
                 operators.map(flatten_tuple_to_list),
-                operators.flat_map(lambda x: from_future(asyncio.ensure_future(self._handler(*x)))),
+                operators.flat_map(lambda x: from_future(asyncio.ensure_future(self.handler(*x)))),
                 operators.share()
             )
 
@@ -125,8 +124,10 @@ class ReactiveTask:
             await self.on_change()
 
     async def retry(self) -> None:
+        await asyncio.sleep(10)
+        print(f"retrying {self.task.name}")
         await self.set_status(Status.READY_TO_RETRY)
         self.subject.on_next(Event(task=self.task, type=EventType.RETRY))
-        await asyncio.sleep(2)
-        await self.set_status(Status.RUNNING)
+        await asyncio.sleep(10)
+        print(f"retrying {self.task.name}")
         self.subject.on_next(Event(task=self.task, type=EventType.RUN))

@@ -1,7 +1,8 @@
-import {apiClient} from '@/lib/api/client';
-import {type Job, jobListResponseSchema, type Jobs, jobSchema} from "@/lib/schemas";
+import {apiClient} from "@/lib/api/client";
+import {type Job, jobGraphResponseSchema, jobListResponseSchema, type Jobs} from "@/lib/schemas";
+import {z} from "zod";
 
-const BASE_PATH = '/api/jobs';
+const BASE_PATH = "/api/jobs";
 
 export const nightBatchJobApi = {
     getJobs: async (): Promise<Jobs> => {
@@ -9,7 +10,11 @@ export const nightBatchJobApi = {
         return apiClient.get(url, jobListResponseSchema);
     },
 
-    getJob: async (runId: string): Promise<Job> => {
-        return apiClient.get(`${BASE_PATH}/${runId}`, jobSchema);
+    getJob: async (jobId: string): Promise<Job> => {
+        return apiClient.get(`${BASE_PATH}/${jobId}`, jobGraphResponseSchema);
+    },
+
+    retryTask: async (jobId: string, taskId: string): Promise<void> => {
+        await apiClient.post<{task_id: string}>(`${BASE_PATH}/${jobId}/retries`, z.any(), { task_id: taskId });
     },
 };

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from pydantic import BaseModel
@@ -17,6 +18,7 @@ class PricingEngine(PricingLibrary):
 class BuildLibraryTask(Task[PricingLibrary, PricingEngine]):
     async def action(self) -> PricingEngine:
         print(f"executing action BuildLibraryTask {self.parent.name}")
+        await asyncio.sleep(2)
         return PricingEngine(
             name=self.input.name,
             engine=f"engine-{self.input.name}-{uuid.uuid4()}",

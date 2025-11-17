@@ -3,35 +3,36 @@ import {BaseNode, BaseNodeContent,} from "@/components/base-node";
 import type {Node, NodeProps} from '@xyflow/react';
 import {Position} from "@xyflow/react";
 import {BaseHandle} from "@/components/base-handle.tsx";
-import {type TaskResponse} from "@/features/night-batch";
+import {type TaskResponse} from "@/lib/schemas";
 import {Workflow} from "lucide-react";
 import {NodeAppendix} from "@/components/node-appendix.tsx";
 import {Badge} from "@/components/ui/badge.tsx";
+import {Separator} from "@/components/ui/separator.tsx";
 
 
 type TaskSubflowNodeProps = NodeProps<Node & {
     data: {
-        runId: string;
-        label: string;
+        jobId: string;
         task: TaskResponse,
-        taskPath: string,
     };
 }>
 
 
 export const SubflowNode = memo((node: TaskSubflowNodeProps) => {
-    const {label, task} = node.data
+    const {task} = node.data
 
 
     return (
-        <BaseNode className="h-full border-2  border-dashed bg-transparent">
-            <NodeAppendix position="top" className="border-none bg-transparent p-0">
+        <BaseNode className="h-full border  border-dashed bg-transparent">
+            <NodeAppendix position="top" className="border-none bg-transparent p-3">
                 <Badge
-                    className="gap-1 self-start border-2  p-1 text-xs  rounded-none border-dashed"
-                    variant="outline"
+                    className="rounded "
+                    variant="secondary"
                 >
-                    <Workflow className="text-muted-foreground text-lg size-6!"/>
-                    <span className="text-lg">{label.toUpperCase()} - {task.state.toUpperCase()}</span>
+                    <Workflow/>
+                    <span>{(task.name || task.kind).toUpperCase()}</span>
+                    -
+                    <span>{task.status}</span>
                 </Badge>
             </NodeAppendix>
             <BaseNodeContent>
@@ -42,4 +43,4 @@ export const SubflowNode = memo((node: TaskSubflowNodeProps) => {
     );
 });
 
-SubflowNode.displayName = "TaskNode";
+SubflowNode.displayName = "SubflowNode";
