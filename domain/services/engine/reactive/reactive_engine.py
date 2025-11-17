@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+import asyncio
+import dataclasses
+import uuid
+
+from domain.job_repository import JobRepository
+from domain.services.engine.reactive.event import Event, EventType
+from domain.services.engine.reactive.graph_builder import build_reactive_graph
+from domain.services.engine.reactive.reactive_job import ReactiveJob
+
+
+@dataclasses.dataclass
+class ReactiveEngine:
+    repository: JobRepository
+    lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock, init=False)
+    done: asyncio.Event = dataclasses.field(default_factory=asyncio.Event, init=False)
+
+    def on_next(self, events: tuple[Event, Event]):
+        event = events[1]
+        if event.task.is_finished and event.type == EventType.RUN:
+            self.done.set()
+            print(f"Job {event.task} Completed")
+
+    async def _safe_commit(self) -> None:
+        await self.repository.flush()
+        await self.repository.commit()
+
+    async def run(self, job_id: uuid.UUID) -> None:
+        job = await self.repository.get(job_id)
+        nodes = build_reactive_graph(job)
+        for node in nodes.values():
+            node.on_change = self._safe_commit
+            node.lock = self.lock
+
+        reactive_job = nodes.get(job)
+
+        if not isinstance(reactive_job, ReactiveJob):
+            raise ValueError("Task must be a Job")
+
+        def on_error(e):
+            print("Job Error", e)
+            self.done.set()
+
+        subscription = reactive_job.observable.subscribe(
+            on_next=self.on_next,
+            on_error=on_error
+        )
+
+        await reactive_job.start()
+        await self.done.wait()
+        subscription.dispose()
+
+    async def retry(self, job_id: uuid.UUID, task_id: uuid.UUID) -> None:
+        job = await self.repository.get(job_id)
+        task = await self.repository.get_task(task_id)
+        nodes = build_reactive_graph(job)
+        for node in nodes.values():
+            node.on_change = self._safe_commit
+            node.lock = self.lock
+
+        reactive_job = nodes.get(job)
+        reactive_task = nodes.get(task)
+
+        if not isinstance(reactive_job, ReactiveJob):
+            raise ValueError("Task must be a Job")
+
+        def on_error(e):
+            print("Job Error", e)
+            self.done.set()
+
+        subscription = reactive_job.observable.subscribe(
+            on_next=self.on_next,
+            on_error=on_error
+        )
+
+        await reactive_task.retry()
+        await self.done.wait()
+        subscription.dispose()
